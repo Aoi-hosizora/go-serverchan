@@ -7,7 +7,7 @@ import (
 
 func TestServerChan(t *testing.T) {
 	client := NewClient()
-	log.Println(client.CheckExist("xxx", "test"))
+	log.Println(client.CheckSckey("xxx", "test"))
 
 	client.SetLogger(NoLogger())
 	_, _, _ = client.Send("xxx", "title", "message")

@@ -30,6 +30,7 @@ const (
 	LMAll
 )
 
+// DefaultLogger (inner)
 type defaultLogger struct {
 	mode DefaultLogMode
 }
@@ -39,6 +40,7 @@ func DefaultLogger(mode DefaultLogMode) *defaultLogger {
 	return &defaultLogger{mode: mode}
 }
 
+// Log with DefaultLogMode.
 func (d *defaultLogger) Log(sckey string, title string, code int32, err error) {
 	mode := d.mode
 	if mode <= LMNone {
@@ -66,6 +68,7 @@ func (d *defaultLogger) Log(sckey string, title string, code int32, err error) {
 	}
 }
 
+// NoLogger (inner)
 type noLogger struct{}
 
 // A serverchan logger that not to do anything.
@@ -73,6 +76,7 @@ func NoLogger() *noLogger {
 	return &noLogger{}
 }
 
+// Log nothing.
 // noinspection GoUnusedParameter
 func (n *noLogger) Log(sckey string, title string, code int32, err error) {}
 

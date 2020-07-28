@@ -12,17 +12,22 @@
 
 ### Usage
 
+> Tips:
+> 1. Errmsg "不要重复发送同样的内容" is replaced to "duplicate message" and still with errno 1024
+> 2. If sckey is not existed, it will return errmsg "bad pushtoken" with errno 1024 (`CheckSckey` will check this errmsg rather than errno)
+> 3. `client.Send` will return three values, and the last value error will have 2 type: general error and server error (can be check by `IsResponseError`)
+
 ```go
 package main
 
 import (
     serverchan "github.com/Aoi-hosizora/go-serverchan"
-    "log"
 )
 
 func main() {
     client := serverchan.NewClient()
-    _, _ = client.Send("sckey", "title", "message")
+    _, _, _ = client.Send("sckey", "title", "message")
+    _, _ = client.CheckSckey("sckey", "test")
 
     // logger
     client.SetLogger(&MyLogger{})
@@ -30,7 +35,5 @@ func main() {
 
 type MyLogger struct{}
 
-func (m *MyLogger) Log(sckey string, title string, err error) {
-    // xxx
-}
+func (m *MyLogger) Log(sckey string, title string, code int32, err error) {}
 ```

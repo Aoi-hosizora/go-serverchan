@@ -31,6 +31,7 @@ type ResponseError struct {
 	Errmsg string `json:"errmsg"`
 }
 
+// new response error (inner)
 func newResponseError(obj *ResponseObject) *ResponseError {
 	return &ResponseError{Errno: obj.Errno, Errmsg: obj.Errmsg}
 }

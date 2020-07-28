@@ -10,7 +10,8 @@ func TestServerChan(t *testing.T) {
 	log.Println(client.CheckSckey("xxx", "test"))
 
 	client.SetLogger(NoLogger())
-	_, _, _ = client.Send("xxx", "title", "message")
+	obj, _, err := client.Send("xxx", "title", "message")
+	log.Println(obj, IsResponseError(err))
 
 	client.SetLogger(DefaultLogger(LMErr))
 	_, _, _ = client.Send("xxx", "title", "message")

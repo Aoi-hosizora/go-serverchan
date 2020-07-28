@@ -13,10 +13,12 @@ const (
 	serverChanApi = "https://sc.ftqq.com/%s.send?text=%s&desp=%s"
 )
 
+// Serverchan's client
 type Client struct {
 	logger Logger
 }
 
+// Create a serverchan's client with LMMask DefaultLogger
 func NewClient() *Client {
 	return &Client{logger: DefaultLogger(LMMask)}
 }
@@ -53,6 +55,7 @@ func (c *Client) Send(sckey string, title string, message string) (*ResponseObje
 	if err != nil {
 		return nil, resp, err
 	}
+
 	content := string(bs)
 	if content == "" {
 		return &ResponseObject{Errno: ErrnoDefault, Errmsg: errmsgDuplicate}, resp, nil

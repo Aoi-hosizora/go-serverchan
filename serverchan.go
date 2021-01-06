@@ -2,6 +2,7 @@ package serverchan
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,82 +11,115 @@ import (
 )
 
 const (
-	serverChanApi = "https://sc.ftqq.com/%s.send?text=%s&desp=%s"
+	// serverchanApiUrl is the serverchan api's url, including sckey string.
+	serverchanApiUrl = "https://sc.ftqq.com/%s.send"
+
+	// contentType is the content type for serverchan api.
+	contentType = "application/x-www-form-urlencoded"
 )
 
-// Serverchan's client
-type Client struct {
-	logger Logger
-}
+// Client represents a serverchan client. Please visit http://sc.ftqq.com/3.version for details.
+type Client struct{}
 
-// Create a serverchan's client with LMMask DefaultLogger
+// NewClient creates a default Client.
 func NewClient() *Client {
-	return &Client{logger: DefaultLogger(LMMask)}
+	return &Client{}
 }
 
-// Set serverchan's logger, use `DefaultLogger` or `NoLogger` or others.
-func (c *Client) SetLogger(logger Logger) {
-	c.logger = logger
-}
+var (
+	// ErrEmptyTitle is an error for empty title.
+	ErrEmptyTitle = errors.New("serverchan: empty title")
 
-// Send title and message to serverchan through `sc.ftqq.com`.
-func (c *Client) Send(sckey string, title string, message string) (*ResponseObject, *http.Response, error) {
-	title = url.QueryEscape(title)
-	message = url.QueryEscape(message)
-	sendUrl := fmt.Sprintf(serverChanApi, sckey, title, message)
+	// ErrBadPushToken is an error for bad push token.
+	ErrBadPushToken = errors.New("serverchan: bad push token")
 
-	// check title
+	// ErrDuplicateMessage is an error for duplicate message.
+	ErrDuplicateMessage = errors.New("serverchan: duplicate message")
+
+	// ErrNotSuccess is an error for not success, used when non-json and errno-non-zero response.
+	ErrNotSuccess = errors.New("serverchan: respond with not success")
+)
+
+// Send sends a message with title to serverchan using given sckey.
+func (c *Client) Send(sckey, title, message string) error {
+	sckey = strings.TrimSpace(sckey)
+	title = strings.TrimSpace(title)
+	message = strings.TrimSpace(message)
 	if title == "" {
-		err := fmt.Errorf("title could not be empty")
-		c.logger.Log(sckey, title, -1, err)
-		return nil, nil, err
+		return ErrEmptyTitle
+	}
+	if sckey == "" {
+		return ErrBadPushToken
 	}
 
-	// post http
-	resp, err := http.Post(sendUrl, "application/x-www-form-urlencoded", strings.NewReader("name=cjb"))
+	form := url.Values{}
+	form.Add("text", title)
+	form.Add("desp", message)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf(serverchanApiUrl, sckey), strings.NewReader(form.Encode()))
 	if err != nil {
-		c.logger.Log(sckey, title, -1, err)
-		return nil, nil, err
+		return err
 	}
+	req.Header.Set("Content-Type", contentType)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
 	body := resp.Body
 	defer body.Close()
-
-	// response content
 	bs, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, resp, err
+		return err
 	}
 
-	content := string(bs)
-	if content == "" {
-		return &ResponseObject{Errno: ErrnoDefault, Errmsg: errmsgDuplicate}, resp, nil
-	}
-
-	obj := &ResponseObject{}
+	obj := &responseObject{}
 	err = json.Unmarshal(bs, obj)
 	if err != nil {
-		return nil, resp, err
+		return ErrNotSuccess
+	}
+	if obj.Errmsg == errmsgBadPushToken {
+		return ErrBadPushToken
+	}
+	if obj.Errmsg == errmsgDuplicate {
+		return ErrDuplicateMessage
+	}
+	if obj.Errno != errnoSuccess {
+		return ErrNotSuccess
 	}
 
-	// check code
-	if obj.Errno != ErrnoSuccess {
-		if obj.Errmsg == errmsgDuplicate {
-			obj.Errmsg = ErrmsgDuplicate
-		}
-		err := newResponseError(obj)
-		c.logger.Log(sckey, title, obj.Errno, err)
-		return obj, resp, err
-	} else {
-		c.logger.Log(sckey, title, obj.Errno, nil)
-		return obj, resp, nil
-	}
+	return nil
 }
 
-// Send a test message to serverchan and check user is existed. (through errno == 1024)
-func (c *Client) CheckSckey(sckey string, testTitle string) (bool, error) {
-	obj, _, err := c.Send(sckey, testTitle, "")
-	if obj != nil {
-		return obj.Errmsg != ErrmsgBadPushToken, nil
+// CheckSckey sends a test message to serverchan and checks valid sckey. (through errno == 1024)
+func (c *Client) CheckSckey(sckey string) (bool, error) {
+	err := c.Send(sckey, "CheckSckey", "")
+
+	if err == ErrBadPushToken {
+		return false, nil
 	}
-	return false, err
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
+
+// responseObject represents serverchan response object.
+// Example responses:
+// 	{"errno":0,"errmsg":"success","dataset":"done"}
+// 	{"errno":1024,"errmsg":"\u4e0d\u8981\u91cd\u590d\u53d1\u9001\u540c\u6837\u7684\u5185\u5bb9"}
+// 	{"errno":1024,"errmsg":"bad pushtoken"}
+// 	<h2>系统消息</h2><p>消息标题不能为空</p>
+type responseObject struct {
+	Errno   int32  `json:"errno"`
+	Errmsg  string `json:"errmsg"`
+	Dataset string `json:"dataset"`
+}
+
+const (
+	errnoSuccess       = 0
+	errmsgBadPushToken = "bad pushtoken"
+	errmsgDuplicate    = "不要重复发送同样的内容"
+)

@@ -3,3 +3,7 @@
 .ionide/
 .history/
 .idea/
+
+### Project ###
+build/
+xxx_test.go
